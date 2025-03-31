@@ -65,7 +65,7 @@ class Soldier(pygame.sprite.Sprite):
         self.speed = speed
         self.ammo = ammo
         self.grenades = grenades
-        self.max_ammo = ammo * 2
+        self.max_ammo = ammo * 20
         self.max_grenades = grenades * 2
         self.max_health = health
         self.direction = Direction.RIGHT
@@ -301,7 +301,7 @@ class Player(Soldier):
     controlled by a special AI agent.
     '''
 
-    def __init__(self, x, y, speed=5, health=100, ammo=20, grenades=5):
+    def __init__(self, x, y, speed=5, health=100, ammo=100, grenades=5):
         '''
         Initializes a Player object by setting animation frames and delays.
         '''

@@ -19,8 +19,8 @@ class GameModes(IntEnum):
 class EnvironmentSettings:
     GRAVITY = 0.75
     SOLDIER_JUMP_STRENGTH = -18
-    BULLET_FULL_DAMAGE = 25
-    BULLET_VELOCITY_X = 15
+    BULLET_FULL_DAMAGE = 10
+    BULLET_VELOCITY_X = 25
     GRENADE_FULL_DAMAGE = 100
     GRENADE_INNER_RADIUS = 50  # pixels from grenade
     GRENADE_OUTER_RADIUS = 200 # pixels from grenade
@@ -29,7 +29,7 @@ class EnvironmentSettings:
     ITEM_VELOCITY_X = 0
     ITEM_VELOCITY_Y = -5
     GRENADE_FUSE_TIME = 1500
-    PLAYER_SHOOT_DELAY = 200
+    PLAYER_SHOOT_DELAY = 50
     PLAYER_THROW_DELAY = 1500
     SOLDIER_SHOOT_DELAY = 500
     SOLDIER_THROW_DELAY = 2000
