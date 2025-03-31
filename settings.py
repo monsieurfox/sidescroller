@@ -18,7 +18,7 @@ class GameModes(IntEnum):
 @dataclass(frozen=True)
 class EnvironmentSettings:
     GRAVITY = 0.75
-    SOLDIER_JUMP_STRENGTH = -13
+    SOLDIER_JUMP_STRENGTH = -18
     BULLET_FULL_DAMAGE = 25
     BULLET_VELOCITY_X = 15
     GRENADE_FULL_DAMAGE = 100
@@ -26,13 +26,16 @@ class EnvironmentSettings:
     GRENADE_OUTER_RADIUS = 200 # pixels from grenade
     GRENADE_VELOCITY_X = 7
     GRENADE_VELOCITY_Y = -11
+    ITEM_VELOCITY_X = 0
+    ITEM_VELOCITY_Y = -5
     GRENADE_FUSE_TIME = 1500
     PLAYER_SHOOT_DELAY = 200
     PLAYER_THROW_DELAY = 1500
     SOLDIER_SHOOT_DELAY = 500
     SOLDIER_THROW_DELAY = 2000
     SOLDIER_SCALE = 1.65
-    ANIMATION_DELAY = 100
+    ANIMATION_DELAY = 200
+    FALL_DAMAGE = 5
 
 # TODO: define TILE_SIZE from the image dimensions instead of hardcoded value
 @dataclass(frozen=True)

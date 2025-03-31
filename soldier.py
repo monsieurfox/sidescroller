@@ -136,7 +136,7 @@ class Soldier(pygame.sprite.Sprite):
         '''
 
         # Handle vertical movement
-        if jump_cmd and not self.in_air:
+        if jump_cmd and not self.in_air and not self.vel_y > 1:
             Soldier.jump_fx.play()
             self.vel_y = ENVIRONMENT.SOLDIER_JUMP_STRENGTH
             self.in_air = True
@@ -159,6 +159,9 @@ class Soldier(pygame.sprite.Sprite):
         '''
         self.vel_y = 0
         self.in_air = False
+
+        if impact_velocity > 19:
+            self.health -= ENVIRONMENT.FALL_DAMAGE
 
     def shoot(self):
         '''

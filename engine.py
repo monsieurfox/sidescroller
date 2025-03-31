@@ -200,6 +200,8 @@ class GameEngine():
             elif item.box_type == 'health':
                 amount = self.player.health + item.quantity
                 self.player.health = min(amount, self.player.max_health)
+            
+            item.sound_fx.play()
     
     def handle_bullet_damage(self):
         '''
@@ -212,6 +214,13 @@ class GameEngine():
                 if enemy.health >= 0:
                     enemy.health -= bullet.damage
                     bullet.kill()
+    
+    # def handle_bullet_collision(self):
+    #     '''
+    #     Check for bullet terrain collision.
+    #     '''
+    #     spritecollide(self.groups['obstacle'], self.groups['bullet'], True)
+            
     
     def make_grenades_explode(self):
         '''
@@ -267,6 +276,9 @@ class GameEngine():
         sprite.vel_y += ENVIRONMENT.GRAVITY
         sprite.vel_y = min(20, sprite.vel_y)
         sprite.dy = int(sprite.vel_y)
+        
+        # if isinstance(sprite, Player) & sprite.dy != 0:
+        #     print(f"{sprite.dy}")
 
         # Calculate lateral movement
         sprite.dx = int(sprite.vel_x * sprite.direction.value)
@@ -322,10 +334,13 @@ class GameEngine():
             self.apply_physics(enemy)
         for grenade in self.groups['grenade']:
             self.apply_physics(grenade)
+        for item in self.groups['item']:
+            self.apply_physics(item)
 
         # Special collision-based updates
         self.collect_item_boxes()
         self.handle_bullet_damage()
+        # self.handle_bullet_collision()
         self.make_grenades_explode()
 
         # Standard updates to all sprite groups
