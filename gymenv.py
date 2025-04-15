@@ -49,6 +49,9 @@ class ShooterEnv(gym.Env):
         # Discrete action space: 7 possible moves
         self.action_space = spaces.Discrete(7)
 
+        self.obstacle_active = False
+        self.obstacles_passed = 0
+
         # Observation: [dx, dy, health, exit_dx, exit_dy, ammo, grenades]
         low = np.array([-10000, -1000, 0, -10000, -10000, 0, 0, 0, 0], dtype=np.float32)
         high = np.array([10000, 1000, 100, 10000, 10000, 50, 20, 1, 1], dtype=np.float32)
@@ -114,6 +117,9 @@ class ShooterEnv(gym.Env):
     def _get_observation(self):
         p = self.game.player
 
+        world_map = self.game.get_world_data()
+        tile_size = TILEMAP.TILE_SIZE
+
         # Distance from start
         p_dx = p.rect.centerx - self.start_x
         p_dy = p.rect.centery - self.start_y
@@ -121,9 +127,19 @@ class ShooterEnv(gym.Env):
         # Exit distance
         exit_dx, exit_dy = self._get_exit_offset(p)
 
-        pit = self._is_pit_ahead(p, self.game.get_world_data(), TILEMAP.TILE_SIZE)
+        obstacle = self._is_obstacle_ahead(p, world_map, tile_size)
 
-        obstacle = self._is_obstacle_ahead(p, self.game.get_world_data(), TILEMAP.TILE_SIZE)
+        obstacle = obstacle if not p.in_air else 0
+
+        if self._is_obstacle_ahead(p, world_map, tile_size):
+            self.current_obstacle_x = p.rect.centerx // tile_size + 1
+            self.obstacle_active = True
+        
+        if self.obstacle_active:
+            if self._did_pass_obstacle(p, self.current_obstacle_x, tile_size):
+                self.obstacle_active = False  # Reset tracking
+                self.obstacles_passed += 1
+
 
         # Create an observation (8 values)
         obs = [
@@ -134,8 +150,8 @@ class ShooterEnv(gym.Env):
             exit_dy,
             p.ammo,
             p.grenades,
-            pit,
-            obstacle
+            obstacle,
+            p.in_air
         ]
 
         # Create debug information
@@ -147,7 +163,7 @@ class ShooterEnv(gym.Env):
 
         return np.array(obs, dtype=np.float32), debug_info
     
-    def _is_pit_ahead(self, player, world_map, tile_size):
+    def _is_obstacle_ahead(self, player, world_map, tile_size):
         num_rows = len(world_map)
         num_cols = len(world_map[0])
 
@@ -158,36 +174,19 @@ class ShooterEnv(gym.Env):
         # Look ahead in the bot's direction
         tile_ahead_x = tile_x + 1
         tile_below_y = tile_y + 1 # We're checking the tile below this position
-
-        # Bounds check
-        if tile_ahead_x < 0 or tile_ahead_x >= num_cols or tile_below_y >= num_rows:
-            return True  # Out of bounds = pit
-
-        tile_below = world_map[tile_below_y][tile_ahead_x]
-
-        # Pit is defined as an empty tile below where we're going
-        return tile_below == TILEMAP.EMPTY_TILE
-
-    def _is_obstacle_ahead(self, player, world_map, tile_size):
-        num_rows = len(world_map)
-        num_cols = len(world_map[0])
-
-        # Get current tile position
-        tile_x = player.rect.centerx // tile_size
-        tile_y = player.rect.centery // tile_size
-
-        # Look ahead in the bot's direction
-        tile_ahead_x = tile_x + 1  # You can make this dynamic based on facing direction
         tile_ahead_y = tile_y
 
         # Bounds check
         if tile_ahead_x < 0 or tile_ahead_x >= num_cols or tile_ahead_y < 0 or tile_ahead_y >= num_rows:
             return True  # Treat out-of-bounds as obstacle
 
+        tile_below = world_map[tile_below_y][tile_ahead_x]
         tile_ahead = world_map[tile_ahead_y][tile_ahead_x]
 
-        # Obstacle is defined as tile with value < DIRT_TILE_LAST
-        return tile_ahead >= TILEMAP.DIRT_TILE_FIRST and tile_ahead <= TILEMAP.DIRT_TILE_LAST
+        pit = tile_below == TILEMAP.EMPTY_TILE
+        obstacle = tile_ahead >= TILEMAP.DIRT_TILE_FIRST and tile_ahead <= TILEMAP.DIRT_TILE_LAST
+
+        return pit or obstacle
 
     def _get_exit_offset(self, player):
         min_dist = float('inf')
@@ -207,14 +206,30 @@ class ShooterEnv(gym.Env):
 
     def _get_reward(self):
         if not self.game.player.alive:
-            return -100
+            return -250
 
-        reward = 0.1 * (self.game.player.rect.centerx - self.start_x)
+        reward = 0
+
+        # Reward for moving forward
+        if self.game.player.rect.centerx > self.start_x:
+            reward += 0.01 * (self.game.player.rect.centerx - self.start_x)
+
+        reward += 20 * self.obstacles_passed
+
+        if not self.game.player.in_air:
+            reward += 0.005
+
         if self.game.level_complete:
-            reward += 100
+            reward += 1000
         
         return reward
 
+    def _did_pass_obstacle(self, player, obstacle_tile_x, tile_size):
+        # Get current tile position
+        tile_x = player.rect.centerx // tile_size
+        
+        # If the bot has moved past the obstacle's x-tile
+        return tile_x > obstacle_tile_x
 
     def _action_to_controller(self, action):
         '''
