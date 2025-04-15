@@ -444,6 +444,9 @@ class GameEngine():
         self.grenade_bar.draw(self.screen, f'GRENADES: {self.player.grenades}')
         self.ammo_bar.draw(self.screen, f'ROUNDS: {self.player.ammo}')
 
+    def get_world_data(self):
+        return self.world_data
+
 
 class GameTile(pygame.sprite.Sprite):
     '''
@@ -521,3 +524,4 @@ class HealthBar():
         rect(screen, COLOR.WHITE, outline_rect)
         rect(screen, COLOR.RED, red_rect)
         rect(screen, COLOR.GREEN, green_rect)
+

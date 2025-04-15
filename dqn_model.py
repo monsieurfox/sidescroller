@@ -127,13 +127,32 @@ class ReplayBuffer:
         batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
+        # Convert to tensors if they are not already tensors (e.g., if they are NumPy arrays)
+        states_tensor = torch.stack([torch.tensor(state).cpu() if isinstance(state, np.ndarray) else state.cpu() 
+                                    if isinstance(state, torch.Tensor) and state.is_cuda else state 
+                                    for state in states]).float().squeeze(1)
+
+        next_states_tensor = torch.stack([torch.tensor(next_state).cpu() if isinstance(next_state, np.ndarray) else next_state.cpu() 
+                                        if isinstance(next_state, torch.Tensor) and next_state.is_cuda else next_state 
+                                        for next_state in next_states]).float()
+
         return (
-            torch.tensor(np.array(states), dtype=torch.float32).squeeze(1),
+            states_tensor,
             torch.tensor(actions, dtype=torch.int64),
             torch.tensor(rewards, dtype=torch.float32),
-            torch.tensor(np.array(next_states), dtype=torch.float32),
+            next_states_tensor,
             torch.tensor(dones, dtype=torch.float32),
         )
+        # states.cpu()
+        # next_states.cpu()
+
+        # return (
+        #     torch.tensor(np.array(states), dtype=torch.float32).squeeze(1),
+        #     torch.tensor(actions, dtype=torch.int64),
+        #     torch.tensor(rewards, dtype=torch.float32),
+        #     torch.tensor(np.array(next_states), dtype=torch.float32),
+        #     torch.tensor(dones, dtype=torch.float32),
+        # )
 
     def clear(self):
         '''

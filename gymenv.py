@@ -7,6 +7,7 @@ from gymnasium import spaces
 from gymnasium.envs.registration import register
 from engine import GameEngine
 from controller import GameController
+from settings import TILEMAP
 
 # Not required unless we want to provide traditional gym.make capabilities
 register(id='Sidescroller-v0',
@@ -49,8 +50,8 @@ class ShooterEnv(gym.Env):
         self.action_space = spaces.Discrete(7)
 
         # Observation: [dx, dy, health, exit_dx, exit_dy, ammo, grenades]
-        low = np.array([-10000, -1000, 0, -10000, -10000, 0, 0], dtype=np.float32)
-        high = np.array([10000, 1000, 100, 10000, 10000, 50, 20], dtype=np.float32)
+        low = np.array([-10000, -1000, 0, -10000, -10000, 0, 0, 0, 0], dtype=np.float32)
+        high = np.array([10000, 1000, 100, 10000, 10000, 50, 20, 1, 1], dtype=np.float32)
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
 
 
@@ -120,7 +121,11 @@ class ShooterEnv(gym.Env):
         # Exit distance
         exit_dx, exit_dy = self._get_exit_offset(p)
 
-        # Create an observation (7 values)
+        pit = self._is_pit_ahead(p, self.game.get_world_data(), TILEMAP.TILE_SIZE)
+
+        obstacle = self._is_obstacle_ahead(p, self.game.get_world_data(), TILEMAP.TILE_SIZE)
+
+        # Create an observation (8 values)
         obs = [
             p_dx,
             p_dy,
@@ -128,7 +133,9 @@ class ShooterEnv(gym.Env):
             exit_dx,
             exit_dy,
             p.ammo,
-            p.grenades
+            p.grenades,
+            pit,
+            obstacle
         ]
 
         # Create debug information
@@ -140,6 +147,47 @@ class ShooterEnv(gym.Env):
 
         return np.array(obs, dtype=np.float32), debug_info
     
+    def _is_pit_ahead(self, player, world_map, tile_size):
+        num_rows = len(world_map)
+        num_cols = len(world_map[0])
+
+        # Get current tile position
+        tile_x = player.rect.centerx // tile_size
+        tile_y = player.rect.centery // tile_size
+
+        # Look ahead in the bot's direction
+        tile_ahead_x = tile_x + 1
+        tile_below_y = tile_y + 1 # We're checking the tile below this position
+
+        # Bounds check
+        if tile_ahead_x < 0 or tile_ahead_x >= num_cols or tile_below_y >= num_rows:
+            return True  # Out of bounds = pit
+
+        tile_below = world_map[tile_below_y][tile_ahead_x]
+
+        # Pit is defined as an empty tile below where we're going
+        return tile_below == TILEMAP.EMPTY_TILE
+
+    def _is_obstacle_ahead(self, player, world_map, tile_size):
+        num_rows = len(world_map)
+        num_cols = len(world_map[0])
+
+        # Get current tile position
+        tile_x = player.rect.centerx // tile_size
+        tile_y = player.rect.centery // tile_size
+
+        # Look ahead in the bot's direction
+        tile_ahead_x = tile_x + 1  # You can make this dynamic based on facing direction
+        tile_ahead_y = tile_y
+
+        # Bounds check
+        if tile_ahead_x < 0 or tile_ahead_x >= num_cols or tile_ahead_y < 0 or tile_ahead_y >= num_rows:
+            return True  # Treat out-of-bounds as obstacle
+
+        tile_ahead = world_map[tile_ahead_y][tile_ahead_x]
+
+        # Obstacle is defined as tile with value < DIRT_TILE_LAST
+        return tile_ahead >= TILEMAP.DIRT_TILE_FIRST and tile_ahead <= TILEMAP.DIRT_TILE_LAST
 
     def _get_exit_offset(self, player):
         min_dist = float('inf')
