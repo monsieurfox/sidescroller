@@ -10,7 +10,8 @@ from settings import FPS
 
 def visualize_episode(model:DQN=None, 
                       #env:ShooterEnv, 
-                      device:str='cpu'):
+                      device:str='cpu',
+                      start_level:int=1):
     '''
     Renders a single episode of the custom Shooter environment using a 
     pre-trained DQN agent.
@@ -28,7 +29,7 @@ def visualize_episode(model:DQN=None,
     # the episode, close the display window. The keyboard is *not* to interact
     # with the game, but we might want to close early.
     clock = pygame.time.Clock()
-    env = ShooterEnv(render_mode="human")
+    env = ShooterEnv(render_mode="human", start_at=start_level)
     if not pygame.get_init():
         pygame.init()
         pygame.mixer.init()
@@ -69,7 +70,11 @@ def visualize_episode(model:DQN=None,
             action = q_vals.argmax().item()
 
         # Perform the next action in the environment.
-        next_state, reward, terminated, truncated, info = env.step(action)
+        next_state, reward, terminated, truncated, info, steps = env.step(action)
+        # print(info, reward)
+        # if steps % 50 == 0 or info['obstacle_ahead']:
+        #     print(info, reward)
+
         done = done or terminated or truncated
         total_reward += reward
         state = torch.from_numpy(next_state).unsqueeze(0).float().to(device)
@@ -79,6 +84,7 @@ def visualize_episode(model:DQN=None,
     time.sleep(1)
     pygame.mixer.music.stop()
     pygame.display.quit()
+    # print(total_reward)
     return total_reward
 
 

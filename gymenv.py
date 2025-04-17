@@ -26,7 +26,7 @@ class ShooterEnv(gym.Env):
         'render_fps': 60
     }
 
-    def __init__(self, render_mode=None):
+    def __init__(self, render_mode=None, start_at=1):
         '''
         Initializes a new Gymnasium environment for the Shooter Game. Loads the
         game engine into the background and defines the action space and the
@@ -44,7 +44,7 @@ class ShooterEnv(gym.Env):
             pygame.display.set_caption('Shooter')
             pygame.mixer.init()
         self.screen = pygame.display.get_surface()
-        self.game = GameEngine(self.screen)
+        self.game = GameEngine(self.screen, start_level=start_at)
 
         # Discrete action space: 7 possible moves
         self.action_space = spaces.Discrete(7)
@@ -53,9 +53,9 @@ class ShooterEnv(gym.Env):
         # self.obstacles_passed = 0
 
         # Observation: [dx, dy, health, exit_dx, exit_dy, ammo, grenades]
-        low = np.array([-10000, -1000, 0, 0, -10000, 0, 0, 0, 0, -1], dtype=np.float32)
-        high = np.array([10000, 1000, 100, 10000, 10000, 50, 20, 1, 1, 1], dtype=np.float32)
-        self.observation_space = spaces.Box(low, high, dtype=np.float32)
+        self.low = np.array([-10000, -1000, 0, 0, -10000, 0, 0, 0, 0, -1], dtype=np.float32)
+        self.high = np.array([10000, 1000, 100, 10000, 10000, 50, 20, 1, 1, 1], dtype=np.float32)
+        self.observation_space = spaces.Box(self.low, self.high, dtype=np.float32)
 
 
     def reset(self, seed=None, options=None):
@@ -68,9 +68,14 @@ class ShooterEnv(gym.Env):
 
         self.obstacle_active = False
         self.obstacles_passed = 0
+        self.prev_obstacles_passed = self.obstacles_passed
         self.prev_x = self.game.player.rect.centerx
         self.still_steps = 0
         self.prev_in_air = self.game.player.in_air
+        
+        self.p_direction = self.game.player.direction
+        self.previous_p_direction = self.p_direction
+        self.direction_swap_ct = 0
 
         # Tracks observation and reward values across steps
         self.start_x = self.game.player.rect.centerx
@@ -101,7 +106,7 @@ class ShooterEnv(gym.Env):
         terminated = not self.game.player.alive or self.game.level_complete
         truncated = self.step_count >= 1000
 
-        return observation, reward, terminated, truncated, debug_info
+        return observation, reward, terminated, truncated, debug_info, self.step_count
 
 
     def render(self):
@@ -137,18 +142,17 @@ class ShooterEnv(gym.Env):
 
         obstacle = obstacle if not p.in_air else False
 
-        if self._is_obstacle_ahead(p, world_map, tile_size):
+        if obstacle:
             self.current_obstacle_x = p.rect.centerx // tile_size + 1
             self.obstacle_active = True
         
-        if self.obstacle_active:
-            if self._did_pass_obstacle(p, self.current_obstacle_x, tile_size):
-                self.obstacle_active = False  # Reset tracking
-                self.obstacles_passed += 1
+        if self.obstacle_active and self._did_pass_obstacle(p, self.current_obstacle_x, tile_size):
+            self.obstacle_active = False  # Reset tracking
+            self.obstacles_passed += 1
 
         exit_dir = 1 if exit_dx > 0 else (-1 if exit_dx < 0 else 0)  # -1 = left, 1 = right
 
-        # Create an observation (8 values)
+        # Create an observation (10 values)
         obs = [
             p_dx,
             p_dy,
@@ -162,6 +166,9 @@ class ShooterEnv(gym.Env):
             exit_dir
         ]
 
+        # Min-Max normalization
+        normalized_obs = (np.array(obs, dtype=np.float32) - self.low) / (self.high - self.low)
+
         # Create debug information
         debug_info = {
             'player_health': p.health,
@@ -170,33 +177,38 @@ class ShooterEnv(gym.Env):
             'obstacle_ahead': obstacle,
             'obstacles_passed': self.obstacles_passed,
             'in_air': p.in_air,
+            'direction': p.direction
         }
 
-        return np.array(obs, dtype=np.float32), debug_info
+        return np.array(normalized_obs, dtype=np.float32), debug_info
     
     def _is_obstacle_ahead(self, player, world_map, tile_size):
         num_rows = len(world_map)
         num_cols = len(world_map[0])
 
-        # Get current tile position
         tile_x = player.rect.centerx // tile_size
         tile_y = player.rect.centery // tile_size
 
-        # Look ahead in the bot's direction
-        tile_ahead_x = tile_x + player.direction
-        tile_below_y = tile_y + 1 # We're checking the tile below this position
+        # Always check one tile to the right (assuming movement is right-facing)
+        # or in the direction the bot was last facing
+        direction = player.direction or 1  # Default to right if standing still
+
+        tile_ahead_x = tile_x + direction
         tile_ahead_y = tile_y
+        tile_below_y = tile_y + 1
 
+        # Treat out-of-bounds as obstacles or pits
         if (
-        tile_ahead_x < 0 or tile_ahead_x >= num_cols or
-        tile_ahead_y < 0 or tile_ahead_y >= num_rows or
-        tile_below_y < 0 or tile_below_y >= num_rows
+            tile_ahead_x < 0 or tile_ahead_x >= num_cols or
+            tile_ahead_y < 0 or tile_ahead_y >= num_rows or
+            tile_below_y < 0 or tile_below_y >= num_rows
         ):
-            return True  # Treat out-of-bounds as obstacle
+            return True
 
-        tile_below = world_map[tile_below_y][tile_ahead_x]
         tile_ahead = world_map[tile_ahead_y][tile_ahead_x]
+        tile_below = world_map[tile_below_y][tile_ahead_x]
 
+        # Define what is considered empty and what is an obstacle
         pit = tile_below == TILEMAP.EMPTY_TILE
         obstacle = tile_ahead >= TILEMAP.DIRT_TILE_FIRST and tile_ahead <= TILEMAP.DIRT_TILE_LAST
 
@@ -221,7 +233,7 @@ class ShooterEnv(gym.Env):
     def _get_reward(self):
         player = self.game.player
         if not player.alive:
-            return -75
+            return -100
 
         reward = 0
         tile_size = TILEMAP.TILE_SIZE
@@ -234,7 +246,7 @@ class ShooterEnv(gym.Env):
             reward += 2 * tile_diff
             self.still_steps = 0
         elif tile_diff < 0:
-            reward -= 3 * abs(tile_diff)
+            reward -= 1.5 * abs(tile_diff)
             self.still_steps = 0
         else:
             self.still_steps += 1
@@ -243,13 +255,28 @@ class ShooterEnv(gym.Env):
 
         # Penalize being still too long
         if self.still_steps > 20:
-            reward -= 1 + 0.05 * self.still_steps
+            penalty = min(5, 1 + 0.03 * self.still_steps)
+            reward -= penalty
 
         # Reward passing obstacles
-        reward += 20 * self.obstacles_passed
+        if self.obstacles_passed > self.prev_obstacles_passed:
+            reward += 75 * (self.obstacles_passed - self.prev_obstacles_passed)
 
+        self.prev_obstacles_passed = self.obstacles_passed
+        
+        # initialize if object ahead
         obstacle_ahead = self._is_obstacle_ahead(player, self.game.get_world_data(), tile_size)
         obstacle_ahead = obstacle_ahead if not player.in_air else False
+
+        # penalize for swapping directions too often
+        if self.previous_p_direction != player.direction:
+            self.direction_swap_ct += 1
+            if self.direction_swap_ct > 5:
+                reward -= min(3.0, 0.5 * self.direction_swap_ct)
+        else:
+            self.direction_swap_ct = 0
+
+        self.previous_p_direction = player.direction
 
         # Movement heuristics
         if not player.in_air:
@@ -261,11 +288,11 @@ class ShooterEnv(gym.Env):
         if not self.prev_in_air and player.in_air and obstacle_ahead:
             reward += 0.2
 
-        if self.still_steps > 350:
+        if self.still_steps > 100:
             player.alive = False
 
         if self.game.level_complete:
-            reward += 350
+            reward += 500
 
         return reward
 

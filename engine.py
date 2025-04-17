@@ -80,7 +80,7 @@ class GameEngine():
             ]       
 
 
-    def __init__(self, screen=None, time_based=False):
+    def __init__(self, screen=None, time_based=False, start_level=1):
         '''
         Creates a new world object.
         '''
@@ -108,7 +108,7 @@ class GameEngine():
             GameEngine.load_assets(False)
         
         # Always start at level 1
-        self.level = 1
+        self.level = start_level
 
 
     def reset_world(self):

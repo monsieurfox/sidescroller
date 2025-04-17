@@ -50,10 +50,7 @@ class DQN(nn.Module):
         - torch.Tensor: A tensor of shape (batch_size, n_actions) containing
         the predicted Q-values for each action.
         '''
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        return self.out(x)
+        return self.out(F.relu(self.fc3(F.relu(self.fc2(F.relu(self.fc1(x)))))))
     
 
     def backpropagate(self, 

@@ -5,13 +5,15 @@ from dqn_model import DQN, ReplayBuffer
 from dqn_render import visualize_episode
 from gymenv import ShooterEnv
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 GAMMA = 0.99             # Discount factor highly values future reward
 EPSILON_START = 1.0      # Begin with 100% random exploration
 EPSILON_DECAY = 0.995    # Decay slowly
 EPSILON_MIN = 0.05       # Never fully stop exploring
-TARGET_UPDATE_FREQ = 15  # How often to reload stable_net from online_net
-TARGET_RENDER_FREQ = 50  # How often to render the agent during training
+TARGET_UPDATE_FREQ = 10  # How often to reload stable_net from online_net
+TARGET_RENDER_FREQ = 25  # How often to render the agent during training
 BATCH_SIZE = 64          # Balance learning with efficiency
 MAX_EPISODES = 64_000    # 64k ought to be enough for anybody! :)
 
@@ -59,8 +61,11 @@ def train_episode(env:ShooterEnv,
                 action = q_vals.argmax().item()
 
         # Take a step forward in the game environment.
-        nstate, reward, terminated, truncated, info = env.step(action)
+        nstate, reward, terminated, truncated, info, steps = env.step(action)
         # print(info)
+        # if steps % 100 == 0 or info['obstacle_ahead']:
+        #     print(info)
+
         done = terminated or truncated
         total_reward += reward
 
@@ -150,6 +155,8 @@ def main():
         if episode > 0 and episode % (TARGET_RENDER_FREQ * 2) == 0:
             plt.figure(figsize=(12, 6))
             plt.plot(episode_rewards, label='Episode Reward')
+            smoothed = np.convolve(episode_rewards, np.ones(10)/10, mode='valid')
+            plt.plot(smoothed, label="Smoothed Reward", linewidth=2)
             plt.xlabel('Episode')
             plt.ylabel('Total Reward')
             plt.title(f'Training Progress Over {episode} Episodes')
