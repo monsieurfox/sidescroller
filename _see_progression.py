@@ -33,13 +33,7 @@ for i, path in enumerate(model_paths):
     runs = 3 if i == len(model_paths) - 1 else 1  # run the final model twice (on level 1 and level 2)
 
     for run_idx in range(runs):
-        if run_idx == 0:
-            level = 1
-        elif run_idx == 1:
-            level = 2  
-        else:
-            level = 3  # increment level for second run of last model  
-        # level = 1 if run_idx == 0 else 2  # increment level for second run of last model
+        level = run_idx + 1
         print(f"Running model: {path} | Level: {level}")
 
         # create environment for the specified level
