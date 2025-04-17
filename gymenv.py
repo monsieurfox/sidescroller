@@ -220,65 +220,55 @@ class ShooterEnv(gym.Env):
 
     def _get_reward(self):
         player = self.game.player
-
         if not player.alive:
-            return -150
+            return -75
 
         reward = 0
+        tile_size = TILEMAP.TILE_SIZE
+        current_tile = player.rect.centerx // tile_size
+        prev_tile = self.prev_x // tile_size
+        tile_diff = current_tile - prev_tile
 
-        # movement reward — based on forward progress since last frame
-        current_x = player.rect.centerx
-        dx = current_x - self.prev_x
-
-        if dx > 0:
-            reward += 0.1 * dx 
+        # Movement reward: based on number of tiles moved
+        if tile_diff > 0:
+            reward += 2 * tile_diff
             self.still_steps = 0
-        elif dx < 0:
-            reward -= 0.2 * abs(dx) 
+        elif tile_diff < 0:
+            reward -= 3 * abs(tile_diff)
             self.still_steps = 0
         else:
             self.still_steps += 1
 
-        self.prev_x = current_x
+        self.prev_x = player.rect.centerx
 
-        # Penalize for being still too long
+        # Penalize being still too long
         if self.still_steps > 20:
-            reward -= 1 + 0.05 * self.still_steps  # grows the longer it stands still
+            reward -= 1 + 0.05 * self.still_steps
 
         # Reward passing obstacles
         reward += 20 * self.obstacles_passed
 
-        obstacle = self._is_obstacle_ahead(player, self.game.get_world_data(), TILEMAP.TILE_SIZE)
+        obstacle_ahead = self._is_obstacle_ahead(player, self.game.get_world_data(), tile_size)
+        obstacle_ahead = obstacle_ahead if not player.in_air else False
 
-        obstacle = obstacle if not player.in_air else False
+        # Movement heuristics
+        if not player.in_air:
+            reward += 0.05 if not obstacle_ahead else -1.0
+        else:
+            reward += 0.05 if obstacle_ahead else -0.1
 
-        # Encourage grounded movement if it's safe
-        if not player.in_air and not obstacle:
-            reward += 0.05
+        # Encourage jumping over obstacles at right time
+        if not self.prev_in_air and player.in_air and obstacle_ahead:
+            reward += 0.2
 
-        # Penalize airtime when no obstacle is ahead
-        if player.in_air and not obstacle:
-            reward -= 0.1
-
-        # Encourage being in air when an obstacle is ahead
-        if player.in_air and obstacle:
-            reward += 0.05
-
-        # Inside reward logic
-        if obstacle and not player.in_air:
-            reward -= 0.2  # discourage running into walls without jumping
-        
-        if self.prev_in_air == False and player.in_air and obstacle:
-            reward += 0.2  # small positive for jumping when obstacle detected
-
-        if self.still_steps > 250:
+        if self.still_steps > 350:
             player.alive = False
 
-        # Big reward for finishing the level
         if self.game.level_complete:
-            reward += 1000
-        
+            reward += 350
+
         return reward
+
 
     def _did_pass_obstacle(self, player, obstacle_tile_x, tile_size):
         # Get current tile position

@@ -4,6 +4,7 @@ import torch
 from dqn_model import DQN, ReplayBuffer
 from dqn_render import visualize_episode
 from gymenv import ShooterEnv
+import matplotlib.pyplot as plt
 
 GAMMA = 0.99             # Discount factor highly values future reward
 EPSILON_START = 1.0      # Begin with 100% random exploration
@@ -118,6 +119,8 @@ def main():
     # Use ADAM gradient descent and a replay buffer to store state transitions.
     replay = ReplayBuffer()
 
+    episode_rewards = []
+
     # Main learning loop, going through each episode one at a time.
     print(f"Training started...")
     for episode in range(1, MAX_EPISODES):
@@ -136,11 +139,25 @@ def main():
             print(f"(updated stable network with latest from online network)")
             stable_net.load_state_dict(online_net.state_dict())
 
+        episode_rewards.append(reward)
+
         # Report on the learning progress (and render agent every x episodes).
         if episode > 0 and episode % TARGET_RENDER_FREQ == 0:
             print(f"\n>> Visualizing agent at episode {episode} <<\n")
             visualize_episode(online_net, device)
             torch.save(online_net.state_dict(), f'trained_models/dqn_shooter_{episode}.pt')
+
+        if episode > 0 and episode % (TARGET_RENDER_FREQ * 2) == 0:
+            plt.figure(figsize=(12, 6))
+            plt.plot(episode_rewards, label='Episode Reward')
+            plt.xlabel('Episode')
+            plt.ylabel('Total Reward')
+            plt.title(f'Training Progress Over {episode} Episodes')
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(f'trained_models/reward_plot_{episode}.png')
+
         print(f"Episode {episode:>6} | "
               f"Reward: {reward:>10.2f} | "
               f"Epsilon: {epsilon:.3f}")
