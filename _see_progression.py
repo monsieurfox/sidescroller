@@ -30,10 +30,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # loop through each model checkpoint
 for i, path in enumerate(model_paths):
-    runs = 2 if i == len(model_paths) - 1 else 1  # run the final model twice (on level 1 and level 2)
+    runs = 3 if i == len(model_paths) - 1 else 1  # run the final model twice (on level 1 and level 2)
 
     for run_idx in range(runs):
-        level = 1 if run_idx == 0 else 2  # increment level for second run of last model
+        if run_idx == 0:
+            level = 1
+        elif run_idx == 1:
+            level = 2  
+        else:
+            level = 3  # increment level for second run of last model  
+        # level = 1 if run_idx == 0 else 2  # increment level for second run of last model
         print(f"Running model: {path} | Level: {level}")
 
         # create environment for the specified level
